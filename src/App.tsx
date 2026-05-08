@@ -38,39 +38,41 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
+        console.log('User detected:', user.email);
         const isSuperAdmin = user.email?.toLowerCase() === 'ppdbaplikasi212@gmail.com';
         
-        // Check if user is in allowed admins list
-        const adminRef = doc(db, 'admins', user.uid);
-        const adminDoc = await safeGetDoc(adminRef);
-        
-        // Fallback: check by email if UID doc doesn't exist yet
         let isStaff = false;
-        if (adminDoc && adminDoc.exists()) {
-          isStaff = true;
-        } else if (user.email) {
-          // Instead of query (which requires list permission), we try to get the doc with email as ID
-          const emailDocRef = doc(db, 'admins', user.email.toLowerCase());
-          const emailDoc = await safeGetDoc(emailDocRef);
+        try {
+          // Check if user is in allowed admins list
+          const adminRef = doc(db, 'admins', user.uid);
+          const adminDoc = await safeGetDoc(adminRef);
           
-          if (emailDoc && emailDoc.exists()) {
+          if (adminDoc && adminDoc.exists()) {
             isStaff = true;
-            // Auto-migrate to UID-based doc for better performance
-            await safeSetDoc(adminRef, {
-              email: user.email.toLowerCase(),
-              role: (emailDoc.data() as any).role || 'staff',
-              createdAt: serverTimestamp()
-            });
-            // We can optionally delete the old email-based doc, 
-            // but keeping it is safer for rule-access-via-email-ID
+          } else if (user.email) {
+            const emailDocRef = doc(db, 'admins', user.email.toLowerCase());
+            const emailDoc = await safeGetDoc(emailDocRef);
+            
+            if (emailDoc && emailDoc.exists()) {
+              isStaff = true;
+              // Auto-migrate to UID-based doc
+              await safeSetDoc(adminRef, {
+                email: user.email.toLowerCase(),
+                role: (emailDoc.data() as any).role || 'staff',
+                createdAt: serverTimestamp()
+              });
+            }
           }
+        } catch (err) {
+          console.error('Error during admin verification:', err);
         }
 
         setIsAdmin(isSuperAdmin || isStaff);
-
+        
         if (isSuperAdmin) {
           try {
-            // Ensure super admin doc exists
+            const adminRef = doc(db, 'admins', user.uid);
+            const adminDoc = await safeGetDoc(adminRef);
             if (!adminDoc || !adminDoc.exists()) {
               await safeSetDoc(adminRef, {
                 email: user.email.toLowerCase(),
@@ -79,18 +81,18 @@ export default function App() {
               });
             }
             
-            // Seed settings ONLY here for the owner if they don't exist
             const settingsRef = doc(db, 'settings', 'general');
             const settingsDoc = await safeGetDoc(settingsRef);
             if (settingsDoc && !settingsDoc.exists()) {
               await safeSetDoc(settingsRef, {
                 facilities: ['Kelas Digital', 'Lab Komputer', 'Tahfidz Qur\'an', 'Shalat Berjamaah'],
                 extracurriculars: ['Pramuka', 'PMR', 'Seni Baca Qur\'an', 'Futsal'],
+                academicYear: '2024 / 2025',
                 updatedAt: serverTimestamp()
               });
             }
           } catch (err) {
-            console.error('Error seeding admin/settings:', err);
+            console.error('Initial setup error:', err);
           }
         }
       } else {
@@ -103,6 +105,19 @@ export default function App() {
       settingsSub();
     };
   }, []);
+
+  const handleLogin = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (err: any) {
+      console.error('Login error:', err);
+      if (err.code === 'auth/unauthorized-domain') {
+        alert('Domain Anda belum terdaftar di Firebase Console. Silakan tambahkan "ppdbmtsn3bombana.vercel.app" di Authentication > Settings > Authorized Domains.');
+      } else {
+        alert('Gagal login: ' + (err.message || 'Error tidak diketahui'));
+      }
+    }
+  };
 
   if (loading) {
     return (
@@ -161,7 +176,7 @@ export default function App() {
           ) : (
             <div className="flex items-center gap-2">
               <button 
-                onClick={signInWithGoogle}
+                onClick={handleLogin}
                 className="bg-amber-400 text-emerald-950 px-4 md:px-5 py-2 rounded-lg font-black flex items-center gap-2 hover:bg-amber-300 transition-all text-xs shadow-lg shadow-amber-600/20"
               >
                 <LogIn size={16} /> LOGIN PANITIA
