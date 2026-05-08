@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() { return request.auth != null; }
+    
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.email == 'ppdbaplikasi212@gmail.com';
+    }
+
+    function isAdmin() { 
+      return isSuperAdmin() || (
+        isSignedIn() && (
+          exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+          exists(/databases/$(database)/documents/admins/$(request.auth.token.email))
+        )
+      );
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    function isValidRegistrant(data) {
+      return data.fullName is string && data.fullName.size() >= 2 &&
+             data.nisn is string && data.nisn.size() >= 10 &&
+             data.originSchool is string &&
+             data.phone is string &&
+             data.gender is string &&
+             data.birthPlace is string &&
+             data.birthDate is string &&
+             data.fatherName is string &&
+             data.motherName is string &&
+             data.address is string &&
+             data.status in ['Pending', 'Verified', 'Rejected'] &&
+             data.photoUrl is string && 
+             data.familyCardUrl is string;
+    }
+
+    match /registrants/{registrantId} {
+      allow get: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid);
+      allow list: if isAdmin();
+      allow create: if isValidId(registrantId) &&
+                      isValidRegistrant(incoming()) && 
+                      incoming().status == 'Pending' &&
+                      incoming().createdAt == request.time;
+      allow update: if (isAdmin() || (
+                      isSignedIn() && 
+                      existing().userId == request.auth.uid &&
+                      isValidRegistrant(incoming()) &&
+                      incoming().status == existing().status
+                    )) && (isAdmin() || (incoming().updatedAt == request.time || !incoming().diff(existing()).affectedKeys().hasAny(['updatedAt'])));
+      allow delete: if isAdmin();
+    }
+
+    match /admins/{id} {
+      // Allow anyone to check their own admin status
+      allow get: if isSignedIn() && (
+        id == request.auth.uid || 
+        (exists(/databases/$(database)/documents/admins/$(id)) && get(/databases/$(database)/documents/admins/$(id)).data.email == request.auth.token.email)
+      );
+      
+      // Super admin can manage the list
+      allow list, write: if isSuperAdmin();
+      
+      // Staff can "self-migrate" to UID-based document if their email is in the list
+      allow create: if isSignedIn() && id == request.auth.uid && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.token.email)) ||
+        isSuperAdmin()
+      );
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

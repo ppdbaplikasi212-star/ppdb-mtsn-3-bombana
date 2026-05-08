@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "registrant": {
+      "title": "Registrant",
+      "description": "Student candidate applications for MTsN 3 Bombana",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string", "description": "Full name of the student" },
+        "nisn": { "type": "string", "description": "National Student Identification Number" },
+        "originSchool": { "type": "string", "description": "Previous school name" },
+        "birthPlace": { "type": "string" },
+        "birthDate": { "type": "string", "format": "date" },
+        "gender": { "type": "string", "enum": ["Laki-laki", "Perempuan"] },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "motherName": { "type": "string" },
+        "photoUrl": { "type": "string", "description": "URL of the student's pasfoto" },
+        "familyCardUrl": { "type": "string", "description": "URL of the family card scan/photo" },
+        "status": { "type": "string", "enum": ["Pending", "Verified", "Rejected"], "description": "Application status" },
+        "testScheduleId": { "type": "string", "description": "ID of the assigned test schedule" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullName", "nisn", "originSchool", "birthPlace", "birthDate", "gender", "phone", "address", "photoUrl", "familyCardUrl"]
+    },
+    "testSchedule": {
+      "title": "Test Schedule",
+      "description": "Details for the entrance examination",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string" },
+        "room": { "type": "string" },
+        "maxCapacity": { "type": "integer" },
+        "currentCount": { "type": "integer" },
+        "description": { "type": "string" }
+      },
+      "required": ["date", "time", "room", "maxCapacity"]
+    },
+    "admin": {
+      "title": "Admin",
+      "description": "Authorized administrators",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string" }
+      },
+      "required": ["email"]
+    }
+  },
+  "firestore": {
+    "registrants/{registrantId}": {
+      "schema": "registrant",
+      "description": "Collection of all registrants"
+    },
+    "testSchedules/{scheduleId}": {
+      "schema": "testSchedule",
+      "description": "Available testing schedules"
+    },
+    "admins/{adminUid}": {
+      "schema": "admin",
+      "description": "List of administrative users"
+    }
+  }
+}
