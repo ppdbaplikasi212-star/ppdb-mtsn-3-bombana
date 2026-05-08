@@ -53,7 +53,7 @@ export default function AdminDashboard() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
-    setIsSuperAdmin(auth.currentUser?.email === 'ppdbaplikasi212@gmail.com');
+    setIsSuperAdmin(auth.currentUser?.email?.toLowerCase() === 'ppdbaplikasi212@gmail.com');
     const q = query(collection(db, 'registrants'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
@@ -84,11 +84,18 @@ export default function AdminDashboard() {
 
     // Fetch Admins if super admin
     let adminSub = () => {};
-    if (auth.currentUser?.email === 'ppdbaplikasi212@gmail.com') {
-      adminSub = onSnapshot(collection(db, 'admins'), (snapshot) => {
-        setAdminList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
-      });
-    }
+    const checkAdminAndListen = async () => {
+      const email = auth.currentUser?.email;
+      if (email?.toLowerCase() === 'ppdbaplikasi212@gmail.com') {
+        adminSub = onSnapshot(collection(db, 'admins'), (snapshot) => {
+          setAdminList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+        }, (err) => {
+          console.error('Admin list fetch error:', err);
+        });
+      }
+    };
+    
+    checkAdminAndListen();
 
     return () => {
       unsubscribe();
@@ -675,7 +682,7 @@ export default function AdminDashboard() {
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{admin.role}</p>
                           </div>
                         </div>
-                        {admin.email !== 'ppdbaplikasi212@gmail.com' && (
+                        {admin.email?.toLowerCase() !== 'ppdbaplikasi212@gmail.com' && (
                           <button 
                             onClick={() => removeAdmin(admin.id, admin.email)}
                             className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100 flex items-center justify-center shrink-0"

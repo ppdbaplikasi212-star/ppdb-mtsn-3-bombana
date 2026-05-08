@@ -10,14 +10,14 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     
     function isSuperAdmin() {
-      return isSignedIn() && request.auth.token.email == 'ppdbaplikasi212@gmail.com';
+      return isSignedIn() && request.auth.token.email != null && request.auth.token.email == 'ppdbaplikasi212@gmail.com';
     }
 
     function isAdmin() { 
       return isSuperAdmin() || (
         isSignedIn() && (
           exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-          exists(/databases/$(database)/documents/admins/$(request.auth.token.email))
+          (request.auth.token.email != null && exists(/databases/$(database)/documents/admins/$(request.auth.token.email)))
         )
       );
     }
@@ -67,6 +67,9 @@ service cloud.firestore {
       
       // Super admin can manage the list
       allow list, write: if isSuperAdmin();
+      
+      // Allow self-management for staff (migration etc)
+      allow update, delete: if isSignedIn() && (id == request.auth.uid || id == request.auth.token.email);
       
       // Staff can "self-migrate" to UID-based document if their email is in the list
       allow create: if isSignedIn() && id == request.auth.uid && (

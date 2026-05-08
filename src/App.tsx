@@ -38,7 +38,7 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
-        const isSuperAdmin = user.email === 'ppdbaplikasi212@gmail.com';
+        const isSuperAdmin = user.email?.toLowerCase() === 'ppdbaplikasi212@gmail.com';
         
         // Check if user is in allowed admins list
         const adminRef = doc(db, 'admins', user.uid);
@@ -49,17 +49,20 @@ export default function App() {
         if (adminDoc && adminDoc.exists()) {
           isStaff = true;
         } else if (user.email) {
-          const adminsRef = collection(db, 'admins');
-          const q = query(adminsRef, where('email', '==', user.email.toLowerCase()));
-          const querySnapshot = await getDocs(q);
-          if (!querySnapshot.empty) {
+          // Instead of query (which requires list permission), we try to get the doc with email as ID
+          const emailDocRef = doc(db, 'admins', user.email.toLowerCase());
+          const emailDoc = await safeGetDoc(emailDocRef);
+          
+          if (emailDoc && emailDoc.exists()) {
             isStaff = true;
             // Auto-migrate to UID-based doc for better performance
             await safeSetDoc(adminRef, {
               email: user.email.toLowerCase(),
-              role: 'staff',
+              role: (emailDoc.data() as any).role || 'staff',
               createdAt: serverTimestamp()
             });
+            // We can optionally delete the old email-based doc, 
+            // but keeping it is safer for rule-access-via-email-ID
           }
         }
 
